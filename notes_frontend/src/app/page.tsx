@@ -1,101 +1,163 @@
-import Image from "next/image";
+"use client";
+import React, { useState, useMemo } from "react";
+import { useNotes } from "./hooks/useNotes";
+import { useCategories } from "./hooks/useCategories";
+import { useUser } from "./hooks/useUser";
+import Sidebar from "./components/Sidebar";
+import TopNav from "./components/TopNav";
+import NoteList from "./components/NoteList";
+import NoteEditor from "./components/NoteEditor";
+
+const colorVars = `
+:root {
+  --primary: #1e88e5;
+  --secondary: #90caf9;
+  --accent: #fbc02d;
+}
+`;
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  // App state hooks
+  const user = useUser();
+  const {
+    notes,
+    addNote,
+    updateNote,
+    deleteNote,
+  } = useNotes();
+  const {
+    categories,
+    addCategory,
+  } = useCategories();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+  // UI state
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
+  const [isNew, setIsNew] = useState(false);
+
+  // computed filtered notes
+  const filteredNotes = useMemo(() => {
+    let filtered = notes;
+    if (selectedCategoryId && selectedCategoryId !== "all") {
+      filtered = filtered.filter(n => n.category === selectedCategoryId);
+    }
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (n) =>
+          n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          n.content.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    return filtered;
+  }, [notes, selectedCategoryId, searchQuery]);
+
+  const selectedNote = useMemo(
+    () => notes.find((n) => n.id === selectedNoteId) || null,
+    [notes, selectedNoteId]
+  );
+
+  const handleSelectNote = (id: string) => {
+    setSelectedNoteId(id);
+    setShowEditor(false);
+    setIsNew(false);
+  };
+
+  const handleCreate = () => {
+    setSelectedNoteId(null);
+    setShowEditor(true);
+    setIsNew(true);
+  };
+
+  const handleSave = (fields: { title: string; content: string; category: string }) => {
+    if (isNew) {
+      const newNote = addNote(fields.title, fields.content, fields.category);
+      setSelectedNoteId(newNote.id);
+    } else if (selectedNote) {
+      updateNote(selectedNote.id, fields);
+    }
+    setShowEditor(false);
+    setIsNew(false);
+  };
+
+  // New category event
+  const handleAddCategory = (name: string) => {
+    const newCat = addCategory(name);
+    setSelectedCategoryId(newCat.id);
+  };
+
+  // Minimalistic demo authentication
+  // Optionally replace with real auth
+  // Show a login UI if user is null (never for now)
+  // ...
+
+  // Responsive design handled by flex/grid
+  return (
+    <div className="flex flex-col min-h-screen bg-gray-50" style={{ minWidth: 0 }}>
+      <style>{colorVars}</style>
+      <TopNav user={user} onSearch={setSearchQuery} searchValue={searchQuery} />
+
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar
+          categories={categories}
+          selectedCategoryId={selectedCategoryId}
+          onSelect={(catId) => {
+            setSelectedCategoryId(catId);
+            setSelectedNoteId(null);
+            setShowEditor(false);
+          }}
+          onAdd={handleAddCategory}
+        />
+
+        {/* Main content area */}
+        <main className="flex-1 flex flex-col h-full py-7 px-8 bg-white overflow-auto">
+          <div className="flex gap-4 mb-6">
+            <button
+              className="bg-primary text-white px-5 py-2 rounded hover:bg-accent font-semibold transition-all"
+              onClick={handleCreate}
+            >
+              + New Note
+            </button>
+          </div>
+          <div className="flex flex-col-reverse lg:flex-row gap-8 h-[70vh]">
+            <section className="w-full lg:w-1/3 min-w-64 max-w-sm">
+              <NoteList
+                notes={filteredNotes}
+                selectedId={selectedNoteId}
+                onSelect={handleSelectNote}
+                onDelete={deleteNote}
+              />
+            </section>
+            <section className="flex-1 max-w-3xl">
+              {showEditor || (isNew && !selectedNote) ? (
+                <NoteEditor
+                  note={null}
+                  categories={categories}
+                  onSave={handleSave}
+                  onCancel={() => {
+                    setShowEditor(false);
+                    setIsNew(false);
+                  }}
+                  isNew={true}
+                />
+              ) : selectedNote ? (
+                <NoteEditor
+                  note={selectedNote}
+                  categories={categories}
+                  onSave={handleSave}
+                  onCancel={() => setSelectedNoteId(null)}
+                  isNew={false}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400 text-xl">
+                  Select or create a note to begin.
+                </div>
+              )}
+            </section>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
